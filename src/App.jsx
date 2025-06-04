@@ -1,69 +1,161 @@
-import { useState, useEffect } from 'react'
-import './App.css'
-import samuelfoto from './assets/JEMA SVA 009-04.jpg'
+import { useState, useEffect } from 'react';
+import './App.css';
+import samuelfoto from './assets/JEMA SVA 009-04.jpg';
+
+// URL base da API
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 function App() {
-  const [valorArrecadado, setValorArrecadado] = useState(0)
-  const [porcentagem, setPorcentagem] = useState(0)
-  const [showModal, setShowModal] = useState(false)
-  const [valorDoacao, setValorDoacao] = useState('')
-  const [nomeDoador, setNomeDoador] = useState('')
-  const [mensagem, setMensagem] = useState('')
-  const [doacoes, setDoacoes] = useState([])
-  const [paginaAtual, setPaginaAtual] = useState(1)
-  const [itensPorPagina] = useState(5)
-  const [pixCopiado, setPixCopiado] = useState(false)
+  // Estados para o formulário de doação
+  const [showModal, setShowModal] = useState(false);
+  const [nomeDoador, setNomeDoador] = useState('');
+  const [valorDoacao, setValorDoacao] = useState('');
+  const [mensagem, setMensagem] = useState('');
+  const [pixCopiado, setPixCopiado] = useState(false);
   
-  const META = 3000
+  // Estados para a paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina] = useState(5);
   
+  // Estados para os dados da API
+  const [valorArrecadado, setValorArrecadado] = useState(0);
+  const [doacoes, setDoacoes] = useState([]);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [porcentagem, setPorcentagem] = useState(0);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(null);
+  
+  // Dados da vaquinha
+  const META = 3000;
+  
+  // Calcular a porcentagem arrecadada (sem limitar a 100%)
   useEffect(() => {
-    // Calcula a porcentagem arrecadada sem limitar a 100%
-    const novoPercentual = (valorArrecadado / META) * 100
-    setPorcentagem(novoPercentual)
-  }, [valorArrecadado, META])
+    const novoPercentual = (valorArrecadado / META) * 100;
+    setPorcentagem(novoPercentual);
+  }, [valorArrecadado, META]);
   
+  // Função para formatar a data no padrão dd/mm/yyyy
+  const formatarData = (dataString) => {
+    if (!dataString) return '';
+    const data = new Date(dataString);
+    return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}/${data.getFullYear()}`;
+  };
+  
+  // Buscar o total arrecadado da API
+  useEffect(() => {
+    const buscarTotal = async () => {
+      try {
+        console.log('Buscando total arrecadado da API:', `${API_URL}/api/total`);
+        const resposta = await fetch(`${API_URL}/api/total`);
+        if (!resposta.ok) {
+          throw new Error('Erro ao buscar total arrecadado');
+        }
+        const dados = await resposta.json();
+        console.log('Total arrecadado recebido:', dados);
+        setValorArrecadado(dados.total);
+      } catch (erro) {
+        console.error('Erro ao buscar total:', erro);
+        setErro('Não foi possível carregar o total arrecadado.');
+      }
+    };
+    
+    buscarTotal();
+  }, []);
+  
+  // Buscar doações da API com paginação
+  useEffect(() => {
+    const buscarDoacoes = async () => {
+      setCarregando(true);
+      try {
+        console.log('Buscando doações da API:', `${API_URL}/api/doacoes?page=${paginaAtual}&limit=${itensPorPagina}`);
+        const resposta = await fetch(`${API_URL}/api/doacoes?page=${paginaAtual}&limit=${itensPorPagina}`);
+        if (!resposta.ok) {
+          throw new Error('Erro ao buscar doações');
+        }
+        const dados = await resposta.json();
+        console.log('Doações recebidas:', dados);
+        setDoacoes(dados.doacoes);
+        setTotalPaginas(dados.totalPages);
+        setCarregando(false);
+      } catch (erro) {
+        console.error('Erro ao buscar doações:', erro);
+        setErro('Não foi possível carregar as doações.');
+      }
+    };
+    
+    buscarDoacoes();
+  }, [paginaAtual, itensPorPagina]);
+
+  // Abrir o modal de contribuição
   const handleContribuir = () => {
-    setShowModal(true)
-  }
+    setShowModal(true);
+  };
   
-  const formatarData = (data) => {
-    const dia = data.getDate().toString().padStart(2, '0')
-    const mes = (data.getMonth() + 1).toString().padStart(2, '0')
-    const ano = data.getFullYear()
-    return `${dia}/${mes}/${ano}`
-  }
-  
-  const handleConfirmarDoacao = () => {
+  // Confirmar a doação
+  const handleConfirmarDoacao = async () => {
     if (!valorDoacao || isNaN(parseFloat(valorDoacao)) || parseFloat(valorDoacao) <= 0) {
-      alert('Por favor, insira um valor válido para doação')
-      return
+      alert('Por favor, insira um valor válido para doação');
+      return;
     }
     
-    const valor = parseFloat(valorDoacao)
+    const valor = parseFloat(valorDoacao);
     const novaDoacao = {
       nome: nomeDoador || 'Anônimo',
-      valor,
-      mensagem: mensagem || '',
-      data: formatarData(new Date())
-    }
+      valor: valor,
+      mensagem: mensagem || ''
+    };
     
-    setDoacoes([novaDoacao, ...doacoes])
-    setValorArrecadado(valorArrecadado + valor)
-    setShowModal(false)
-    setValorDoacao('')
-    setNomeDoador('')
-    setMensagem('')
-  }
+    console.log('Enviando nova doação:', novaDoacao);
+    
+    try {
+      const resposta = await fetch(`${API_URL}/api/doacoes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(novaDoacao)
+      });
+      
+      if (!resposta.ok) {
+        throw new Error('Erro ao enviar doação');
+      }
+      
+      const doacaoConfirmada = await resposta.json();
+      console.log('Doação confirmada:', doacaoConfirmada);
+      
+      // Atualizar os dados após a doação bem-sucedida
+      setValorArrecadado(valorArrecadado + valor);
+      setShowModal(false);
+      setValorDoacao('');
+      setNomeDoador('');
+      setMensagem('');
+      
+      // Recarregar a lista de doações
+      console.log('Recarregando lista de doações após nova doação');
+      const respostaDoacoes = await fetch(`${API_URL}/api/doacoes?page=1&limit=${itensPorPagina}`);
+      if (respostaDoacoes.ok) {
+        const dadosDoacoes = await respostaDoacoes.json();
+        console.log('Novas doações carregadas:', dadosDoacoes);
+        setDoacoes(dadosDoacoes.doacoes);
+        setTotalPaginas(dadosDoacoes.totalPages);
+        setPaginaAtual(1); // Voltar para a primeira página
+      }
+    } catch (erro) {
+      console.error('Erro ao enviar doação:', erro);
+      setErro('Não foi possível enviar a doação.');
+      alert('Erro ao enviar doação. Por favor, tente novamente.');
+    }
+  };
   
+  // Formatar valor para o formato de moeda brasileira
   const formatarValor = (valor) => {
-    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  }
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+  };
   
   // Cálculos para a paginação
-  const indexUltimoItem = paginaAtual * itensPorPagina
-  const indexPrimeiroItem = indexUltimoItem - itensPorPagina
-  const doacoesAtuais = doacoes.slice(indexPrimeiroItem, indexUltimoItem)
-  const totalPaginas = Math.ceil(doacoes.length / itensPorPagina)
+  const indexUltimoItem = paginaAtual * itensPorPagina;
+  const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
+  const doacoesAtuais = doacoes.slice(indexPrimeiroItem, indexUltimoItem);
   
   // Função para mudar de página
   const mudarPagina = (numeroPagina) => {
@@ -82,157 +174,164 @@ function App() {
   }
 
   return (
-    <div className="container">
-      <header className="header">
+    <div className="App">
+      <header>
         <h1>Vaquinha Solidária - Elaine e William</h1>
       </header>
-      
-      <main className="main-content">
-        <div className="top-section">
-          <div className="image-container">
-            <img 
-              src={samuelfoto} 
-              alt="Foto do Samuel" 
-              className="main-image" 
-            />
+
+      <main>
+        {carregando && <div className="loading">Carregando dados...</div>}
+        {erro && <div className="error">{erro}</div>}
+        
+        <div className="container">
+          <div className="info-container">
+            <div className="image-container">
+              <img src={samuelfoto} alt="Samuel" />
+            </div>
+            <div className="description-container">
+              <p>
+                Estamos realizando esta vaquinha para ajudar os pais do pequeno Samuel, Elaine e William, que infelizmente faleceu recentemente. O valor arrecadado será destinado a ajudar com os custos do sepultamento e outras despesas neste momento difícil.
+              </p>
+              <p>
+                Qualquer valor é bem-vindo e fará diferença para a família.
+              </p>
+              <div className="progress-container">
+                <div className="progress-info">
+                  <span>Meta: {formatarValor(META)}</span>
+                  <span>Arrecadado: {formatarValor(valorArrecadado)}</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress" style={{ width: `${Math.min(porcentagem, 100)}%` }}></div>
+                </div>
+              </div>
+              <button className="contribute-button" onClick={handleContribuir}>
+                Quero Contribuir
+              </button>
+            </div>
           </div>
-          
-          <div className="description">
-            <h2>Descrição</h2>
-            <p>
-              Essa vaquinha foi criada para ajudar os pais (Elaine e William) do pequeno Samuel que infelizmente veio a óbito. 
-              O objetivo é arrecadar fundos para cobrir custos com sepultamento e outras despesas neste momento difícil.
-            </p>
+
+          <div className="donations-container">
+            <h2>Contribuições</h2>
+            {carregando ? (
+              <p>Carregando doações...</p>
+            ) : (
+              <>
+                <ul className="donations-list">
+                  {doacoesAtuais.length > 0 ? (
+                    doacoesAtuais.map((doacao, index) => (
+                      <li key={index} className="donation-item">
+                        <div className="donation-header">
+                          <span className="donator-name">{doacao.nome}</span>
+                          <span className="donation-date">{formatarData(doacao.data)}</span>
+                        </div>
+                        <div className="donation-amount">{formatarValor(doacao.valor)}</div>
+                        {doacao.mensagem && <div className="donation-message">{doacao.mensagem}</div>}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="no-donations">Nenhuma doação registrada ainda.</li>
+                  )}
+                </ul>
+
+                {totalPaginas > 1 && (
+                  <div className="pagination">
+                    {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((numero) => (
+                      <button
+                        key={numero}
+                        onClick={() => mudarPagina(numero)}
+                        className={numero === paginaAtual ? 'active' : ''}
+                      >
+                        {numero}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-        
-        <div className="progress-section">
-          <div className="progress-info">
-            <h3>Meta: {formatarValor(META)}</h3>
-            <h3>Arrecadado: {formatarValor(valorArrecadado)}</h3>
-          </div>
-          
-          <div className="progress-bar-container">
-            <div 
-              className="progress-bar" 
-              style={{ width: `${Math.min(porcentagem, 100)}%` }}
-            ></div>
-          </div>
-          
-          <p className="progress-percentage">{porcentagem.toFixed(1)}% da meta</p>
-          
-          <button className="contribute-button" onClick={handleContribuir}>
-            Contribuir Agora
-          </button>
-        </div>
-        
-        <div className="donations-list">
-          <h3>Últimas Contribuições</h3>
-          {doacoes.length > 0 ? (
-            <>
-              <ul>
-                {doacoesAtuais.map((doacao, index) => (
-                  <li key={index} className="donation-item">
-                    <div className="donation-header">
-                      <span className="donator-name">{doacao.nome}</span>
-                      <span className="donation-amount">{formatarValor(doacao.valor)}</span>
-                    </div>
-                    {doacao.mensagem && <p className="donation-message">"{doacao.mensagem}"</p>}
-                    <span className="donation-date">{doacao.data}</span>
-                  </li>
-                ))}
-              </ul>
+
+        {showModal && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <h2>Contribuir</h2>
+              <p>Para contribuir com a vaquinha, faça uma transferência via PIX:</p>
               
-              {totalPaginas > 1 && (
-                <div className="pagination">
-                  {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(numero => (
+              <div className="pix-info">
+                <div className="pix-item">
+                  <span className="pix-label">Chave PIX:</span>
+                  <div className="pix-value-container">
+                    <span className="pix-value">arianegbg@gmail.com</span>
                     <button 
-                      key={numero} 
-                      onClick={() => mudarPagina(numero)}
-                      className={paginaAtual === numero ? 'active' : ''}
+                      className={`copy-button ${pixCopiado ? 'copied' : ''}`} 
+                      onClick={copiarPix}
                     >
-                      {numero}
+                      {pixCopiado ? 'Copiado!' : 'Copiar'}
                     </button>
-                  ))}
+                  </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <p className="no-donations">Ainda não há contribuições. Seja o primeiro a contribuir!</p>
-          )}
-        </div>
-      </main>
-      
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>Faça sua contribuição</h3>
-            
-            <div className="payment-info">
-              <h4>Dados para transferência:</h4>
-              <div className="payment-details">
-                <div className="pix-container">
-                  <p><strong>PIX:</strong> arianegbg@gmail.com</p>
-                  <button 
-                    className={`copy-button ${pixCopiado ? 'copied' : ''}`} 
-                    onClick={copiarPix}
-                  >
-                    {pixCopiado ? 'Copiado!' : 'Copiar'}
-                  </button>
+                <div className="pix-item">
+                  <span className="pix-label">Banco:</span>
+                  <span className="pix-value">Santander</span>
                 </div>
-                <p><strong>Banco:</strong> Santander</p>
-                <p><strong>Nome:</strong> Ariane Araújo da Silva</p>
+                <div className="pix-item">
+                  <span className="pix-label">Nome:</span>
+                  <span className="pix-value">Ariane Araújo da Silva</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="nome">Seu Nome (opcional):</label>
+                <input
+                  type="text"
+                  id="nome"
+                  value={nomeDoador}
+                  onChange={(e) => setNomeDoador(e.target.value)}
+                  placeholder="Anônimo"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="valor">Valor Doado (R$):</label>
+                <input
+                  type="number"
+                  id="valor"
+                  value={valorDoacao}
+                  onChange={(e) => setValorDoacao(e.target.value)}
+                  placeholder="0,00"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="mensagem">Mensagem (opcional):</label>
+                <textarea
+                  id="mensagem"
+                  value={mensagem}
+                  onChange={(e) => setMensagem(e.target.value)}
+                  placeholder="Deixe uma mensagem de apoio..."
+                ></textarea>
+              </div>
+
+              <div className="modal-buttons">
+                <button className="cancel-button" onClick={() => setShowModal(false)}>
+                  Cancelar
+                </button>
+                <button className="confirm-button" onClick={handleConfirmarDoacao}>
+                  Confirmar Doação
+                </button>
               </div>
             </div>
-            
-            <div className="form-group">
-              <label>Valor da doação (R$):</label>
-              <input 
-                type="number" 
-                value={valorDoacao}
-                onChange={(e) => setValorDoacao(e.target.value)}
-                placeholder="Ex: 50"
-                min="1"
-              />
-            </div>
-            
-            <div className="form-group">
-              <label>Seu nome (opcional):</label>
-              <input 
-                type="text" 
-                value={nomeDoador}
-                onChange={(e) => setNomeDoador(e.target.value)}
-                placeholder="Ex: João Silva"
-              />
-            </div>
-            
-            <div className="form-group">
-              <label>Mensagem (opcional):</label>
-              <textarea 
-                value={mensagem}
-                onChange={(e) => setMensagem(e.target.value)}
-                placeholder="Deixe uma mensagem de apoio..."
-              ></textarea>
-            </div>
-            
-            <div className="modal-buttons">
-              <button className="cancel-button" onClick={() => setShowModal(false)}>
-                Cancelar
-              </button>
-              <button className="confirm-button" onClick={handleConfirmarDoacao}>
-                Confirmar Doação
-              </button>
-            </div>
           </div>
-        </div>
-      )}
-      
-      <footer className="footer">
-        <p>© 2025 Vaquinha Solidária - Elaine e William</p>
+        )}
+      </main>
+
+      <footer>
+        <p>&copy; {new Date().getFullYear()} Vaquinha Solidária - Elaine e William</p>
         <p>Essa é uma página de arrecadação solidária.</p>
       </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
