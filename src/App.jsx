@@ -5,6 +5,11 @@ import samuelfoto from './assets/JEMA SVA 009-04.jpg';
 // URL base da API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+// Ícone de carro como emoji
+const CarIcon = () => (
+  <span role="img" aria-label="carro" className="car-icon">🚗</span>
+);
+
 function App() {
   // Estados para o formulário de doação
   const [showModal, setShowModal] = useState(false);
@@ -21,18 +26,13 @@ function App() {
   const [valorArrecadado, setValorArrecadado] = useState(0);
   const [doacoes, setDoacoes] = useState([]);
   const [totalPaginas, setTotalPaginas] = useState(1);
-  const [porcentagem, setPorcentagem] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   
   // Dados da vaquinha
   const META = 3000;
   
-  // Calcular a porcentagem arrecadada (sem limitar a 100%)
-  useEffect(() => {
-    const novoPercentual = (valorArrecadado / META) * 100;
-    setPorcentagem(novoPercentual);
-  }, [valorArrecadado, META]);
+  // A barra de progresso está usando um valor fixo para demonstração
   
   // Função para formatar a data no padrão dd/mm/yyyy
   const formatarData = (dataString) => {
@@ -175,37 +175,67 @@ function App() {
 
   return (
     <div className="App">
-      <header>
+      <header className="header">
         <h1>Vaquinha Solidária - Elaine e William</h1>
       </header>
 
-      <main>
+      <main className="main-content">
         {carregando && <div className="loading">Carregando dados...</div>}
         {erro && <div className="error">{erro}</div>}
         
         <div className="container">
-          <div className="info-container">
-            <div className="image-container">
-              <img src={samuelfoto} alt="Samuel" />
+          <div className="description-image-container">
+            <div className="image-wrapper">
+              <img src={samuelfoto} alt="Samuel" className="profile-image" />
             </div>
-            <div className="description-container">
+            
+            <div className="description-card">
+              <h3>Vaquinha Solidária</h3>
               <p>
                 Estamos realizando esta vaquinha para ajudar os pais do pequeno Samuel, Elaine e William, que infelizmente faleceu recentemente. O valor arrecadado será destinado a ajudar com os custos do sepultamento e outras despesas neste momento difícil.
               </p>
               <p>
                 Qualquer valor é bem-vindo e fará diferença para a família.
               </p>
-              <div className="progress-container">
-                <div className="progress-info">
-                  <span>Meta: {formatarValor(META)}</span>
-                  <span>Arrecadado: {formatarValor(valorArrecadado)}</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress" style={{ width: `${Math.min(porcentagem, 100)}%` }}></div>
-                </div>
+            </div>
+          </div>
+          
+          <div className="card donation-card">
+            <div className="donation-info">
+              <div className="donation-header">
+                <h2>Arrecadado</h2>
               </div>
-              <button className="contribute-button" onClick={handleContribuir}>
-                Quero Contribuir
+              
+              <div className="amount-display">
+                <span className="amount">R$ {valorArrecadado.toFixed(2).replace('.', ',')}</span>
+              </div>
+              
+              <p className="goal-text">Meta: R$ {META.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace('.', ',')}</p>
+              
+              {/* Barra de progresso simplificada */}
+              <div style={{ 
+                width: '100%', 
+                height: '8px', 
+                backgroundColor: '#e6e6e6', 
+                borderRadius: '10px',
+                marginBottom: '15px',
+                marginTop: '10px',
+                overflow: 'hidden'
+              }}>
+                <div style={{ 
+                  width: '72%', 
+                  height: '100%', 
+                  backgroundColor: '#4caf50',
+                  borderRadius: '10px'
+                }}></div>
+              </div>
+              
+              <div className="supporters-info">
+                <p>Apoiadores: {doacoes.length}</p>
+              </div>
+              
+              <button className="help-button" onClick={handleContribuir}>
+                Quero Ajudar
               </button>
             </div>
           </div>
@@ -222,7 +252,7 @@ function App() {
                       <li key={index} className="donation-item">
                         <div className="donation-header">
                           <span className="donator-name">{doacao.nome}</span>
-                          <span className="donation-date">{formatarData(doacao.data)}</span>
+                          <span className="donation-date">{formatarData(doacao.data_criacao)}</span>
                         </div>
                         <div className="donation-amount">{formatarValor(doacao.valor)}</div>
                         {doacao.mensagem && <div className="donation-message">{doacao.mensagem}</div>}
@@ -326,7 +356,7 @@ function App() {
         )}
       </main>
 
-      <footer>
+      <footer className="footer">
         <p>&copy; {new Date().getFullYear()} Vaquinha Solidária - Elaine e William</p>
         <p>Essa é uma página de arrecadação solidária.</p>
       </footer>
