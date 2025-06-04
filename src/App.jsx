@@ -67,19 +67,33 @@ function App() {
     const buscarDoacoes = async () => {
       setCarregando(true);
       try {
-        console.log('Buscando doações da API:', `${API_URL}/api/doacoes?page=${paginaAtual}&limit=${itensPorPagina}`);
+        console.log(`Buscando doações da API para página ${paginaAtual} com limite ${itensPorPagina}`);
+        console.log('URL completa:', `${API_URL}/api/doacoes?page=${paginaAtual}&limit=${itensPorPagina}`);
+        
         const resposta = await fetch(`${API_URL}/api/doacoes?page=${paginaAtual}&limit=${itensPorPagina}`);
         if (!resposta.ok) {
-          throw new Error('Erro ao buscar doações');
+          throw new Error(`Erro ao buscar doações: ${resposta.status} ${resposta.statusText}`);
         }
+        
         const dados = await resposta.json();
         console.log('Doações recebidas:', dados);
-        setDoacoes(dados.doacoes);
-        setTotalPaginas(dados.totalPages);
+        console.log(`Total de doações na página ${paginaAtual}:`, dados.doacoes ? dados.doacoes.length : 0);
+        console.log('Total de páginas:', dados.totalPages);
+        console.log('Total de doações no banco:', dados.total);
+        
+        if (dados.doacoes) {
+          setDoacoes(dados.doacoes);
+          setTotalPaginas(dados.totalPages);
+        } else {
+          console.error('Dados de doações inválidos:', dados);
+          setDoacoes([]);
+        }
+        
         setCarregando(false);
       } catch (erro) {
         console.error('Erro ao buscar doações:', erro);
         setErro('Não foi possível carregar as doações.');
+        setCarregando(false);
       }
     };
     
@@ -152,14 +166,11 @@ function App() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   };
   
-  // Cálculos para a paginação
-  const indexUltimoItem = paginaAtual * itensPorPagina;
-  const indexPrimeiroItem = indexUltimoItem - itensPorPagina;
-  const doacoesAtuais = doacoes.slice(indexPrimeiroItem, indexUltimoItem);
-  
   // Função para mudar de página
   const mudarPagina = (numeroPagina) => {
-    setPaginaAtual(numeroPagina)
+    setCarregando(true); // Indica que está carregando durante a mudança de página
+    setPaginaAtual(numeroPagina);
+    // O useEffect que busca as doações será acionado quando paginaAtual mudar
   }
   
   const copiarPix = () => {
@@ -200,41 +211,71 @@ function App() {
             </div>
           </div>
           
-          <div className="card donation-card">
+          <div className="card donation-card" style={{
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            borderRadius: '12px',
+            padding: '28px',
+            background: 'linear-gradient(to bottom, #ffffff, #f9f9f9)'
+          }}>
             <div className="donation-info">
               <div className="donation-header">
-                <h2>Arrecadado</h2>
+                <h2 style={{ fontSize: '1.8rem', marginBottom: '15px' }}>Arrecadado</h2>
               </div>
               
-              <div className="amount-display">
-                <span className="amount">R$ {valorArrecadado.toFixed(2).replace('.', ',')}</span>
+              <div className="amount-display" style={{ marginBottom: '15px' }}>
+                <span className="amount" style={{ fontSize: '2.2rem', fontWeight: '700' }}>R$ {valorArrecadado.toFixed(2).replace('.', ',')}</span>
               </div>
               
-              <p className="goal-text">Meta: R$ {META.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace('.', ',')}</p>
+              <p className="goal-text" style={{ fontSize: '1.2rem', marginBottom: '18px' }}>Meta: R$ {META.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace('.', ',')}</p>
               
-              {/* Barra de progresso simplificada */}
-              <div style={{ 
-                width: '100%', 
-                height: '8px', 
-                backgroundColor: '#e6e6e6', 
-                borderRadius: '10px',
-                marginBottom: '15px',
-                marginTop: '10px',
-                overflow: 'hidden'
-              }}>
+              {/* Barra de progresso baseada no valor arrecadado - Aumentada */}
+              <div style={{ position: 'relative', marginBottom: '30px', marginTop: '15px' }}>
                 <div style={{ 
-                  width: '72%', 
-                  height: '100%', 
-                  backgroundColor: '#4caf50',
-                  borderRadius: '10px'
-                }}></div>
+                  width: '100%', 
+                  height: '16px', 
+                  backgroundColor: '#e6e6e6', 
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <div style={{ 
+                    width: `${(valorArrecadado / META) * 100}%`, 
+                    height: '100%', 
+                    backgroundColor: valorArrecadado >= META ? '#2e7d32' : '#4caf50',
+                    borderRadius: '10px',
+                    transition: 'width 0.5s ease-in-out, background-color 0.5s ease-in-out',
+                    boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.15)'
+                  }}></div>
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  right: '0',
+                  top: '22px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  color: valorArrecadado >= META ? '#2e7d32' : '#555'
+                }}>
+                  {Math.round((valorArrecadado / META) * 100)}%
+                  {valorArrecadado >= META && <span role="img" aria-label="celebração" style={{ marginLeft: '5px' }}>🎉</span>}
+                </div>
               </div>
               
-              <div className="supporters-info">
-                <p>Apoiadores: {doacoes.length}</p>
+              <div className="supporters-info" style={{ marginBottom: '20px' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: '500' }}>Apoiadores: <span style={{ fontWeight: '600' }}>{doacoes.length}</span></p>
               </div>
               
-              <button className="help-button" onClick={handleContribuir}>
+              <button 
+                className="help-button" 
+                onClick={handleContribuir}
+                style={{
+                  padding: '14px 28px',
+                  fontSize: '1.2rem',
+                  fontWeight: '600',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
                 Quero Ajudar
               </button>
             </div>
@@ -242,13 +283,16 @@ function App() {
 
           <div className="donations-container">
             <h2>Contribuições</h2>
+            <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '10px' }}>
+              Página {paginaAtual} de {totalPaginas} • Total: {doacoes.length} doações nesta página
+            </div>
             {carregando ? (
               <p>Carregando doações...</p>
             ) : (
               <>
                 <ul className="donations-list">
-                  {doacoesAtuais.length > 0 ? (
-                    doacoesAtuais.map((doacao, index) => (
+                  {doacoes.length > 0 ? (
+                    doacoes.map((doacao, index) => (
                       <li key={index} className="donation-item">
                         <div className="donation-header">
                           <span className="donator-name">{doacao.nome}</span>
@@ -264,16 +308,59 @@ function App() {
                 </ul>
 
                 {totalPaginas > 1 && (
-                  <div className="pagination">
+                  <div className="pagination" style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                    {/* Botão anterior */}
+                    <button 
+                      onClick={() => paginaAtual > 1 && mudarPagina(paginaAtual - 1)}
+                      disabled={paginaAtual === 1 || carregando}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        backgroundColor: paginaAtual === 1 ? '#f5f5f5' : '#fff',
+                        cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer',
+                        opacity: paginaAtual === 1 ? 0.7 : 1
+                      }}
+                    >
+                      &laquo;
+                    </button>
+                    
+                    {/* Números das páginas */}
                     {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((numero) => (
                       <button
                         key={numero}
-                        onClick={() => mudarPagina(numero)}
-                        className={numero === paginaAtual ? 'active' : ''}
+                        onClick={() => numero !== paginaAtual && mudarPagina(numero)}
+                        disabled={carregando}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '4px',
+                          border: '1px solid #ddd',
+                          backgroundColor: numero === paginaAtual ? '#4caf50' : '#fff',
+                          color: numero === paginaAtual ? '#fff' : '#333',
+                          fontWeight: numero === paginaAtual ? 'bold' : 'normal',
+                          cursor: numero === paginaAtual ? 'default' : 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
                       >
                         {numero}
                       </button>
                     ))}
+                    
+                    {/* Botão próximo */}
+                    <button 
+                      onClick={() => paginaAtual < totalPaginas && mudarPagina(paginaAtual + 1)}
+                      disabled={paginaAtual === totalPaginas || carregando}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        backgroundColor: paginaAtual === totalPaginas ? '#f5f5f5' : '#fff',
+                        cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer',
+                        opacity: paginaAtual === totalPaginas ? 0.7 : 1
+                      }}
+                    >
+                      &raquo;
+                    </button>
                   </div>
                 )}
               </>
